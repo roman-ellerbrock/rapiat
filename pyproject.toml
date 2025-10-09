@@ -13,6 +13,16 @@ channels = ["conda-forge"]
 platforms = ["linux-64", "osx-arm64"]
 
 [tool.pixi.dependencies]
+rdkit = ">=2025.3.2,<2026"
+ase = ">=3.25.0,<4"
+numpy = ">=2.2.6,<3"
+pytorch = ">=2.7.0,<3"
+ipykernel = ">=6.29.5,<7"
+py3dmol = ">=2.5.0,<3"
+matplotlib = ">=3.10.3,<4"
+scikit-learn = ">=1.7.0,<2"
+umap-learn = ">=0.5.7,<0.6"
+hdbscan = ">=0.8.39,<0.9"
 
 [tool.pixi.pypi-dependencies]
 rapiat = { path = ".", editable = true }
