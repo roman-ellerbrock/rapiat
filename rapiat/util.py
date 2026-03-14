@@ -1,24 +1,28 @@
+"""Utility functions for molecular I/O and bond manipulation."""
+
 import numpy as np
 from rdkit import Chem
 from rdkit.Geometry import Point3D
 
 
 def remove_all_bonds(mol):
+    """Remove all bonds from a molecule."""
     mol = Chem.RWMol(mol)
-    for bond in reversed([b for b in mol.GetBonds()]):  # reverse to avoid index shifting
+    for bond in reversed(list(mol.GetBonds())):  # reverse to avoid index shifting
         mol.RemoveBond(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
     return mol
 
 
 def assign_bonds_by_distance(mol, max_CH=1.2, max_CC=1.6):
+    """Assign bonds based on interatomic distances."""
     conf = mol.GetConformer()
     positions = conf.GetPositions()
-    atoms = [a for a in mol.GetAtoms()]
+    atoms = list(mol.GetAtoms())
     mol = Chem.RWMol(mol)
-    existing = set(
+    existing = {
         (min(b.GetBeginAtomIdx(), b.GetEndAtomIdx()), max(b.GetBeginAtomIdx(), b.GetEndAtomIdx()))
         for b in mol.GetBonds()
-    )
+    }
     n = len(atoms)
     for i in range(n):
         for j in range(i + 1, n):
@@ -35,6 +39,7 @@ def assign_bonds_by_distance(mol, max_CH=1.2, max_CC=1.6):
 
 
 def read_xyz_conformers(xyz_file, mol):
+    """Read conformers from a multi-frame XYZ file into an RDKit molecule."""
     with open(xyz_file) as f:
         lines = f.readlines()
 

@@ -1,10 +1,12 @@
+"""Molecular geometry featurization and permutation alignment."""
+
 import numpy as np
 from rdkit import Chem
 from scipy.optimize import quadratic_assignment
 
 
-# Compute moment of inertia tensor for a single conformer (positions: shape (num_atoms, 3))
 def moment_of_inertia_tensor(positions, masses):
+    """Compute the moment of inertia tensor for a single conformer."""
     r2 = np.sum(positions**2, axis=1)
     I = np.zeros((3, 3))
     for i in range(3):
@@ -17,6 +19,7 @@ def moment_of_inertia_tensor(positions, masses):
 
 
 def set_conformer_positions(mol, positions_array):
+    """Write positions back into a molecule's conformers."""
     for conf_id, pos in enumerate(positions_array):
         conf = mol.GetConformer(conf_id)
         for atom_idx in range(mol.GetNumAtoms()):
@@ -24,6 +27,7 @@ def set_conformer_positions(mol, positions_array):
 
 
 def get_conformer_positions(mol) -> np.array:
+    """Return all conformer positions as a (n_confs, n_atoms, 3) array."""
     positions = np.array(
         [mol.GetConformer(i).GetPositions() for i in range(mol.GetNumConformers())]
     )
@@ -31,12 +35,14 @@ def get_conformer_positions(mol) -> np.array:
 
 
 def distance_matrix(positions):
+    """Compute pairwise distance matrices for each conformer."""
     diff = positions[:, :, None, :] - positions[:, None, :, :]
     D = np.linalg.norm(diff, axis=-1)
     return D
 
 
 def inverse_distance_matrix(positions, diag_value=0.0):
+    """Compute pairwise inverse distance matrices for each conformer."""
     diff = positions[:, :, None, :] - positions[:, None, :, :]
     D = np.linalg.norm(diff, axis=-1)
     with np.errstate(divide="ignore"):
@@ -47,10 +53,7 @@ def inverse_distance_matrix(positions, diag_value=0.0):
 
 
 def featurize_molecules(mol: Chem.Mol) -> np.ndarray:
-    """
-    Featurize a molecule into a 2D array of atom features.
-    Each row corresponds to a conformer, and each column corresponds to a feature.
-    """
+    """Featurize a molecule into a 2D array of conformer eigenvalue features."""
     X = get_conformer_positions(mol)
     R = inverse_distance_matrix(X)
     Ravg = np.mean(R, axis=0)
@@ -61,15 +64,10 @@ def featurize_molecules(mol: Chem.Mol) -> np.ndarray:
     return np.array(features)
 
 
-def align_permutations(R1, R2, mol, rng=np.random.default_rng()) -> np.ndarray:
-    """
-    Aligns the second molecules matrix to the first by finding the optimal permutation of atoms
-
-    R1: inverse distance matrix of the first molecule
-    R2: inverse distance matrix of the second molecule
-    mol: RDKit molecule object
-
-    """
+def align_permutations(R1, R2, mol, rng=None) -> np.ndarray:
+    """Align R2 to R1 by finding the optimal atom permutation per element."""
+    if rng is None:
+        rng = np.random.default_rng()
     R2 = R2.copy()
 
     atomic_symbols = np.array([atom.GetSymbol() for atom in mol.GetAtoms()])
@@ -80,7 +78,7 @@ def align_permutations(R1, R2, mol, rng=np.random.default_rng()) -> np.ndarray:
         atom_ids = np.where(atomic_symbols == element)[0]
         # print(f"Aligning element: {element}, atom ids: {atom_ids}")
 
-        partial_match = np.array([[i, i] for i in fixed_atoms])
+        partial_match = np.array([[i, i] for i in fixed_atoms]).reshape(-1, 2)
 
         result = quadratic_assignment(
             R1,
@@ -97,6 +95,7 @@ def align_permutations(R1, R2, mol, rng=np.random.default_rng()) -> np.ndarray:
 
 
 def sample_align_permutations(R1, R2, mol, nsample, rng):
+    """Run multiple random restarts of permutation alignment and keep the best."""
     R2 = R2.copy()
     delta_best = np.linalg.norm(R1 - R2)
     R_best = R2.copy()
@@ -110,7 +109,7 @@ def sample_align_permutations(R1, R2, mol, nsample, rng):
             R_best = Rtry.copy()
             R2 = Rtry
             delta_best = delta
-            P_best
+            P_best = P
         if delta < 1e-6:
             break
 
@@ -118,20 +117,13 @@ def sample_align_permutations(R1, R2, mol, nsample, rng):
 
 
 def permute_R(R1, R2, mol):
+    """Find the optimal atom permutation using mass-weighted distance matrices."""
     masses = np.array([atom.GetMass() for atom in mol.GetAtoms()])
     # multiply row/cols by sum of masses
     M = np.outer(masses, masses)
     M = M / np.mean(masses) ** 2  # normalize by total mass
     R1m = R1 * M
     R2m = R2 * M
-    for bond in mol.GetBonds():
-        i = bond.GetBeginAtomIdx()
-        j = bond.GetEndAtomIdx()
-        # R1m[i, j] *= 10
-        # R1m[j, i] *= 10
-        # R2m[i, j] *= 10
-        # R2m[j, i] *= 10
-
     result = quadratic_assignment(R1m, R2m, options={"maximize": True}, method="2opt")
     P = result["col_ind"]
     R2 = R2[P, :][:, P]

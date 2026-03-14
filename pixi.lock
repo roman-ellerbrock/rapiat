@@ -4724,7 +4724,7 @@ packages:
 - pypi: ./
   name: rapiat
   version: 0.0.1
-  sha256: 73c30e25ed9d8de20bc9c30c93f8b5d4f83504dcd87461f63a491e6963455ef6
+  sha256: 089d854abbc0d00b24cc0bf75a804316ac339b43b75d4da17afe275290d405bd
   requires_python: '>=3.13'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/rdkit-2025.03.2-py313hc8d2389_0.conda
